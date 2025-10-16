@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Mon Extension Brave",
+  "name": "LetterBoost",
   "version": "1.0",
-  "description": "Une extension test pour Brave",
-  "permissions": ["tabs"],
+  "description": "🚀 Generate personalized cover letters from your CV ✍️",
+  "permissions": ["activeTab", "scripting", "storage"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": "icon.png"
