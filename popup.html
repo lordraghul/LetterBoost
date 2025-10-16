@@ -6,13 +6,35 @@
 <head>
     <title>LetterBoost</title>
     <style>
-        body { font-family: Arial; padding: 10px; width: 450px; }
+        body { font-family: Arial; height: 100%; padding: 10px; width: 450px; }
         button { width: 100%; padding: 10px; font-size: 16px; }
-        textarea { width: 100%; height: 150px; margin-top: 10px; }
+        textarea { width: 100%; height: 120px; margin-top: 10px; }
+        input[type="text"] { width: 100%; padding: 8px; margin-top: 10px; }
     </style>
 </head>
 <body>
     <h1>LetterBoost</h1>
+    <label for="languageSelect">Language:</label>
+    <select id="languageSelect">
+        <option value="fr" selected>🇫🇷 Français</option>
+        <option value="en">🇬🇧 English</option>
+        <option value="es">🇪🇸 Español</option>
+        <option value="de">🇩🇪 Deutsch</option>
+        <option value="it">🇮🇹 Italiano</option>
+        <option value="pt">🇵🇹 Português</option>
+        <option value="nl">🇳🇱 Nederlands</option>
+        <option value="sv">🇸🇪 Svenska</option>
+        <option value="no">🇳🇴 Norsk</option>
+        <option value="da">🇩🇰 Dansk</option>
+        <option value="fi">🇫🇮 Suomi</option>
+        <option value="pl">🇵🇱 Polski</option>
+        <option value="ru">🇷🇺 Русский</option>
+        <option value="ja">🇯🇵 日本語</option>
+        <option value="zh">🇨🇳 中文</option>
+        <option value="ko">🇰🇷 한국어</option>
+        <option value="ar">🇸🇦 العربية</option>
+    </select>
+
     <input type="text" id="apiKeyInput" placeholder="Enter your Gemini API key" />
     <button id="saveApiKeyBtn">Save API Key </button>
 
