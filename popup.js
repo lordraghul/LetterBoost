@@ -155,3 +155,23 @@ async function generateWithGemini(prompt, errorMsgElement) {
         return "Error generating letter: " + err.message;
     }
 }
+
+document.getElementById("downloadPdfBtn").addEventListener("click", () => {
+    const letter = document.getElementById("output").value.trim();
+
+    if (!letter) {
+        alert("⚠️ No letter to download!");
+        return;
+    }
+
+    const blob = new Blob([letter], { type: "application/pdf" });
+
+    // Crée un lien temporaire
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "cover_letter.pdf";
+    link.click();
+
+    // Nettoyage mémoire
+    URL.revokeObjectURL(link.href);
+});
