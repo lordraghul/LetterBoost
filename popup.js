@@ -1,3 +1,21 @@
+document.addEventListener('DOMContentLoaded', () => {
+    const tabs = document.querySelectorAll('.tab');
+    const contents = document.querySelectorAll('.tab-content');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Active l'onglet cliqué
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            // Affiche le contenu correspondant
+            contents.forEach(c => c.style.display = 'none');
+            document.getElementById(tab.dataset.tab).style.display = 'block';
+        });
+    });
+});
+
+
 // -------------------- SAVE CV --------------------
 document.getElementById("saveCvBtn").addEventListener("click", () => {
     const cv = document.getElementById("cvInput").value;
@@ -177,8 +195,9 @@ document.getElementById("downloadPdfBtn").addEventListener("click", () => {
     // Nettoyage mémoire
     URL.revokeObjectURL(link.href);
 });
-
+/**
 document.getElementById("downloadPdfBtn").addEventListener("click", () => {
+    console.log("PDF download initiated.");
     const { jsPDF } = window.jspdf;
     if (!jsPDF) {
         alert("⚠️ jsPDF library not loaded!");
@@ -199,4 +218,17 @@ document.getElementById("downloadPdfBtn").addEventListener("click", () => {
         doc.text(lines, 15, 20); // marges
         doc.save("cover_letter.pdf");
     });
+    console.log("PDF download initiated.");
 });
+*/
+
+/**
+document.addEventListener("DOMContentLoaded", () => {
+
+
+    const doc = new jsPDF();
+    doc.text("Hello PDF!", 10, 10);
+    doc.save("test.pdf");
+});
+
+*/
