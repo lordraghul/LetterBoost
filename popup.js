@@ -195,6 +195,7 @@ document.getElementById("downloadPdfBtn").addEventListener("click", () => {
     // Nettoyage mémoire
     URL.revokeObjectURL(link.href);
 });
+
 /**
 document.getElementById("downloadPdfBtn").addEventListener("click", () => {
     console.log("PDF download initiated.");
