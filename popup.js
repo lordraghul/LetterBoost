@@ -196,40 +196,87 @@ document.getElementById("downloadPdfBtn").addEventListener("click", () => {
     URL.revokeObjectURL(link.href);
 });
 
-/**
+
+// -------------------- DOWNLOAD PDF --------------------
 document.getElementById("downloadPdfBtn").addEventListener("click", () => {
-    console.log("PDF download initiated.");
-    const { jsPDF } = window.jspdf;
-    if (!jsPDF) {
-        alert("⚠️ jsPDF library not loaded!");
+    console.log("📄 PDF download initiated.");
+    
+    // Vérifier que jsPDF est chargé
+    if (typeof window.jspdf === 'undefined') {
+        alert("⚠️ jsPDF library not loaded! Please reload the extension.");
         return;
     }
+
+    const { jsPDF } = window.jspdf;
 
     // Récupérer la lettre depuis Chrome Storage
     chrome.storage.local.get("generatedLetter", (data) => {
         const letter = data.generatedLetter?.trim();
+        
         if (!letter) {
-            alert("⚠️ No letter to download!");
+            alert("⚠️ No letter to download! Please generate a letter first.");
             return;
         }
 
-        // Générer le PDF
-        const doc = new jsPDF();
-        const lines = doc.splitTextToSize(letter, 180); // largeur texte
-        doc.text(lines, 15, 20); // marges
-        doc.save("cover_letter.pdf");
+        try {
+            // Créer un nouveau document PDF
+            const doc = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            // Configuration de la police et de la taille
+            doc.setFont("helvetica");
+            doc.setFontSize(11);
+
+            // Marges
+            const leftMargin = 20;
+            const rightMargin = 20;
+            const topMargin = 20;
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const maxLineWidth = pageWidth - leftMargin - rightMargin;
+
+            // Diviser le texte en lignes qui s'adaptent à la largeur de la page
+            const lines = doc.splitTextToSize(letter, maxLineWidth);
+
+            // Position verticale initiale
+            let yPosition = topMargin;
+            const lineHeight = 7; // Espacement entre les lignes
+
+            // Ajouter le texte ligne par ligne avec gestion des pages
+            lines.forEach((line, index) => {
+                // Vérifier si on doit ajouter une nouvelle page
+                if (yPosition + lineHeight > pageHeight - 20) {
+                    doc.addPage();
+                    yPosition = topMargin;
+                }
+                
+                doc.text(line, leftMargin, yPosition);
+                yPosition += lineHeight;
+            });
+
+            // Générer le nom du fichier avec la date
+            const today = new Date();
+            const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            const filename = `cover_letter_${dateStr}.pdf`;
+
+            // Sauvegarder le PDF
+            doc.save(filename);
+            
+            console.log("✅ PDF generated successfully!");
+            
+            // Message de confirmation (optionnel)
+            const msg = document.getElementById("message");
+            if (msg) {
+                msg.textContent = "PDF downloaded successfully! ✅";
+                setTimeout(() => msg.textContent = "", 3000);
+            }
+            
+        } catch (error) {
+            console.error("❌ Error generating PDF:", error);
+            alert("⚠️ Error generating PDF: " + error.message);
+        }
     });
-    console.log("PDF download initiated.");
 });
-*/
-
-/**
-document.addEventListener("DOMContentLoaded", () => {
-
-
-    const doc = new jsPDF();
-    doc.text("Hello PDF!", 10, 10);
-    doc.save("test.pdf");
-});
-
-*/
