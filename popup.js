@@ -176,23 +176,9 @@ async function generateWithGemini(prompt, errorMsgElement) {
     }
 }
 
-document.getElementById("downloadPdfBtn").addEventListener("click", () => {
-    const letter = document.getElementById("output").value.trim();
+document.getElementById("downloadBtn").addEventListener("click", async () => {
 
-    if (!letter) {
-        alert("⚠️ No letter to download!");
-        return;
-    }
-
-    const blob = new Blob([letter], { type: "application/pdf" });
-
-    // Crée un lien temporaire
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "cover_letter.pdf";
-    link.click();
-
-    // Nettoyage mémoire
-    URL.revokeObjectURL(link.href);
+  // Envoie la lettre au background pour téléchargement
+  chrome.runtime.sendMessage({ action: "downloadLetter" });
 });
 
