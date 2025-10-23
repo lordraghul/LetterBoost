@@ -1,4 +1,3 @@
-const { PDFDocument, rgb } = PDFLib;
 
 document.addEventListener('DOMContentLoaded', () => {
     const tabs = document.querySelectorAll('.tab');
@@ -178,14 +177,16 @@ async function generateWithGemini(prompt, errorMsgElement) {
     }
 }
 
-/*
+
 document.getElementById("downloadBtn").addEventListener("click", async () => {
 
   // Envoie la lettre au background pour téléchargement
   chrome.runtime.sendMessage({ action: "downloadLetter" });
 });
-*/
+/*
 document.getElementById("downloadBtn").addEventListener("click", async () => {
+    const { PDFDocument, rgb } = PDFLib;
+
     const data = await new Promise(resolve => chrome.storage.local.get("generatedLetter", resolve));
     const letter = (data.generatedLetter || "").trim();
 
@@ -219,3 +220,4 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
     URL.revokeObjectURL(link.href);
 });
 
+*/
