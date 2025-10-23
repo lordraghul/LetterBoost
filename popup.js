@@ -1,3 +1,5 @@
+const { PDFDocument, rgb } = PDFLib;
+
 document.addEventListener('DOMContentLoaded', () => {
     const tabs = document.querySelectorAll('.tab');
     const contents = document.querySelectorAll('.tab-content');
@@ -176,9 +178,44 @@ async function generateWithGemini(prompt, errorMsgElement) {
     }
 }
 
+/*
 document.getElementById("downloadBtn").addEventListener("click", async () => {
 
   // Envoie la lettre au background pour téléchargement
   chrome.runtime.sendMessage({ action: "downloadLetter" });
+});
+*/
+document.getElementById("downloadBtn").addEventListener("click", async () => {
+    const data = await new Promise(resolve => chrome.storage.local.get("generatedLetter", resolve));
+    const letter = (data.generatedLetter || "").trim();
+
+    if (!letter) {
+        alert("⚠️ No letter to download");
+        return;
+    }
+
+    // Création PDF
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage();
+    const { width, height } = page.getSize();
+
+    page.drawText(letter, {
+        x: 50,
+        y: height - 50,
+        size: 12,
+        color: rgb(0, 0, 0),
+        maxWidth: width - 100,
+        lineHeight: 14
+    });
+
+    const pdfBytes = await pdfDoc.save();
+
+    // Télécharger le PDF
+    const blob = new Blob([pdfBytes], { type: "application/pdf" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "cover_letter.pdf";
+    link.click();
+    URL.revokeObjectURL(link.href);
 });
 
