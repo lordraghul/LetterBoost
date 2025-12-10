@@ -1,44 +1,20 @@
-
+// ===== TOUT CE CODE VA DANS UN SEUL DOMContentLoaded =====
 document.addEventListener('DOMContentLoaded', () => {
+    
+    // ===== TABS =====
     const tabs = document.querySelectorAll('.tab');
     const contents = document.querySelectorAll('.tab-content');
 
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
-            // Active l'onglet cliqué
             tabs.forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
-
-            // Affiche le contenu correspondant
             contents.forEach(c => c.style.display = 'none');
             document.getElementById(tab.dataset.tab).style.display = 'block';
         });
     });
-});
 
-
-// -------------------- SAVE CV --------------------
-document.getElementById("saveCvBtn").addEventListener("click", () => {
-    const cv = document.getElementById("cvInput").value;
-    chrome.storage.local.set({ userCV: cv }, () => {
-        const msg = document.getElementById("message");
-        msg.textContent = "CV saved successfully!";
-        setTimeout(() => msg.textContent = "", 2000);
-    });
-});
-
-// -------------------- SAVE API KEY --------------------
-document.getElementById("saveApiKeyBtn").addEventListener("click", () => {
-    const apiKey = document.getElementById("apiKeyInput").value;
-    chrome.storage.local.set({ userApiKey: apiKey }, () => {
-        const msg = document.getElementById("message");
-        msg.textContent = "API key saved ✅";
-        setTimeout(() => msg.textContent = "", 2000);
-    });
-});
-
-// -------------------- LOAD CV ON POPUP LOAD --------------------
-document.addEventListener("DOMContentLoaded", () => {
+    // ===== LOAD DATA =====
     chrome.storage.local.get("userCV", (data) => {
         if(data.userCV) document.getElementById("cvInput").value = data.userCV;
     });
@@ -50,48 +26,74 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("output").value = data.generatedLetter;
         }
     });
-});
 
-// -------------------- GENERATE LETTER --------------------
-document.addEventListener("DOMContentLoaded", async () => {
-    // Charger la lettre sauvegardée si elle existe
-    chrome.storage.local.get("generatedLetter", (data) => {
-        if (data.generatedLetter) {
-            document.getElementById("output").value = data.generatedLetter;
-        }
+    // ===== SAVE CV =====
+    document.getElementById("saveCvBtn").addEventListener("click", () => {
+        const cv = document.getElementById("cvInput").value;
+        chrome.storage.local.set({ userCV: cv }, () => {
+            const msg = document.getElementById("message");
+            msg.textContent = "CV saved successfully!";
+            setTimeout(() => msg.textContent = "", 2000);
+        });
     });
-});
 
-document.getElementById("generateBtn").addEventListener("click", async () => {
-    const getCV = () => new Promise(resolve => chrome.storage.local.get("userCV", resolve));
-    const data = await getCV();
-    const cv = data.userCV || "";
-    const errorMsg = document.getElementById("errorMsg");
-    const output = document.getElementById("output");
+    // ===== SAVE API KEY =====
+    document.getElementById("saveApiKeyBtn").addEventListener("click", () => {
+        const apiKey = document.getElementById("apiKeyInput").value;
+        chrome.storage.local.set({ userApiKey: apiKey }, () => {
+            const msg = document.getElementById("message");
+            msg.textContent = "API key saved ✅";
+            setTimeout(() => msg.textContent = "", 2000);
+        });
+    });
 
-    if (!cv) {
-        errorMsg.textContent = "⚠️ Please enter your CV first.";
-        errorMsg.style.display = "block";
-        return;
-    } else {
-        errorMsg.style.display = "none";
-    }
+    // ===== GENERATE LETTER =====
+    let lastGenerateTime = 0;
+    const GENERATE_COOLDOWN = 5000; // 5 secondes
 
-    output.value = "⏳ Generating… please wait";
+    const generateBtn = document.getElementById("generateBtn");
 
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        chrome.tabs.sendMessage(tabs[0].id, { action: "getPageText" }, async (response) => {
+    generateBtn.addEventListener("click", async () => {
+        // ✅ Vérifier le cooldown
+        const now = Date.now();
+        if (now - lastGenerateTime < GENERATE_COOLDOWN) {
+            const remaining = Math.ceil((GENERATE_COOLDOWN - (now - lastGenerateTime)) / 1000);
+            const errorMsg = document.getElementById("errorMsg");
+            errorMsg.textContent = `⏳ Please wait ${remaining}s before generating another letter.`;
+            errorMsg.style.display = "block";
+            return;
+        }
+        lastGenerateTime = now;
+
+        const getCV = () => new Promise(resolve => chrome.storage.local.get("userCV", resolve));
+        generateBtn.disabled = true;
+        generateBtn.textContent = "⏳ Generating...";
+        try {
+            const data = await getCV();
+            const cv = data.userCV || "";
+            const errorMsg = document.getElementById("errorMsg");
+            const output = document.getElementById("output");
+
+            if (!cv) {
+                errorMsg.textContent = "⚠️ Please enter your CV first.";
+                errorMsg.style.display = "block";
+                return;
+            } else {
+                errorMsg.style.display = "none";
+            }
+
+            output.value = "⏳ Generating… please wait";
+
+            const response = await getActiveTabText();
             const jobText = response?.text || "";
             const language = document.getElementById("languageSelect").value;
 
-            // Date du jour
             const today = new Date();
             const day = String(today.getDate()).padStart(2, '0');
             const month = String(today.getMonth() + 1).padStart(2, '0');
             const year = today.getFullYear();
             const currentDate = `${day}/${month}/${year}`;
 
-            // Mapping langues
             const languageMap = {
                 fr: "French", en: "English", es: "Spanish", de: "German", it: "Italian",
                 pt: "Portuguese", nl: "Dutch", sv: "Swedish", no: "Norwegian",
@@ -123,31 +125,64 @@ Write a complete, professional cover letter in ${langName} that is directly read
 Date: ${currentDate}
 `;
 
-            const letter = await generateWithGemini(prompt, errorMsg);
+            const letter = await generateWithGemini(prompt);
             if (letter) {
                 output.value = letter;
-
-                // 🧠 Sauvegarder la lettre générée
                 chrome.storage.local.set({ generatedLetter: letter }, () => {
                     console.log("✅ Letter saved in storage.");
                 });
             } else {
                 output.value = "";
             }
+        } catch (err) {
+            console.error(err);
+            const errorMsg = document.getElementById("errorMsg");
+            if (errorMsg) {
+                errorMsg.textContent = err.message || "An unexpected error occurred.";
+                errorMsg.style.display = "block";
+            }
+        } finally {
+            generateBtn.disabled = false;
+            generateBtn.textContent = "Generate Cover Letter";
+        }
+    });
+
+    // ===== DOWNLOAD =====
+    document.getElementById("downloadBtn").addEventListener("click", async () => {
+        chrome.runtime.sendMessage({ action: "downloadLetter" });
+    });
+
+});  // ✅ FIN du DOMContentLoaded unique
+
+// ===== HELPER FUNCTION (OUTSIDE DOMContentLoaded) =====
+function getActiveTabText() {
+    return new Promise((resolve) => {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (chrome.runtime.lastError) {
+                console.info("Content script not available on this page.");
+                return resolve({ text: "" });
+            }
+            if (!tabs || !tabs[0]) return resolve({ text: "" });
+            chrome.tabs.sendMessage(tabs[0].id, { action: "getPageText" }, (response) => {
+                if (chrome.runtime.lastError) {
+                    return resolve({ text: "" });
+                }
+                resolve(response || { text: "" });
+            });
         });
     });
-});
+}
 
-
-// -------------------- FETCH GEMINI --------------------
-async function generateWithGemini(prompt, errorMsgElement) {
+// ===== GEMINI FETCH (OUTSIDE DOMContentLoaded) =====
+async function generateWithGemini(prompt) {
     const storageData = await new Promise(resolve => chrome.storage.local.get("userApiKey", resolve));
     const apiKey = storageData.userApiKey;
+    const errorMsg = document.getElementById("errorMsg");
 
     if (!apiKey) {
-        if (errorMsgElement) {
-            errorMsgElement.textContent = "⚠️ Please enter your API key.";
-            errorMsgElement.style.display = "block";
+        if (errorMsg) {
+            errorMsg.textContent = "⚠️ Please enter your API key in Settings.";
+            errorMsg.style.display = "block";
         }
         return null;
     }
@@ -156,7 +191,14 @@ async function generateWithGemini(prompt, errorMsgElement) {
         contents: [{ parts: [{ text: prompt }] }]
     };
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     try {
+        if (!navigator.onLine) {
+            throw new Error("No internet connection. Please check your network.");
+        }
+
         const response = await fetch(
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
             {
@@ -165,59 +207,56 @@ async function generateWithGemini(prompt, errorMsgElement) {
                     "Content-Type": "application/json",
                     "x-goog-api-key": apiKey
                 },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
+                signal: controller.signal
             }
         );
 
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            let errorMessage = `API Error ${response.status}`;
+            
+            if (response.status === 401 || response.status === 403) {
+                errorMessage = "❌ Invalid API key. Please check your settings.";
+            } else if (response.status === 429) {
+                errorMessage = "⏱️ Too many requests. Please wait a moment and try again.";
+            } else if (response.status === 500 || response.status === 503) {
+                errorMessage = "🔧 Gemini API is temporarily unavailable. Try again later.";
+            } else {
+                errorMessage = `❌ API returned error: ${response.status} ${response.statusText}`;
+            }
+            
+            throw new Error(errorMessage);
+        }
+
         const responseData = await response.json();
-        return responseData.candidates?.[0]?.content?.parts?.[0]?.text || "No response from Gemini.";
+
+        if (!responseData.candidates || responseData.candidates.length === 0) {
+            throw new Error("API returned no content. Try again.");
+        }
+
+        const letterContent = responseData.candidates[0]?.content?.parts?.[0]?.text;
+        
+        if (!letterContent || letterContent.trim() === "") {
+            throw new Error("API returned an empty response. Try with a different job description.");
+        }
+
+        return letterContent;
+
     } catch (err) {
-        console.error("Error generating letter:", err);
-        return "Error generating letter: " + err.message;
+        clearTimeout(timeoutId);
+        console.error("❌ Error generating letter:", err);
+        
+        if (errorMsg) {
+            if (err.name === 'AbortError') {
+                errorMsg.textContent = "⏱️ Request timed out (30s). Try again.";
+            } else {
+                errorMsg.textContent = err.message || "❌ An unexpected error occurred. Check the console.";
+            }
+            errorMsg.style.display = "block";
+        }
+
+        return null;
     }
 }
-
-
-document.getElementById("downloadBtn").addEventListener("click", async () => {
-
-  // Envoie la lettre au background pour téléchargement
-  chrome.runtime.sendMessage({ action: "downloadLetter" });
-});
-/*
-document.getElementById("downloadBtn").addEventListener("click", async () => {
-    const { PDFDocument, rgb } = PDFLib;
-
-    const data = await new Promise(resolve => chrome.storage.local.get("generatedLetter", resolve));
-    const letter = (data.generatedLetter || "").trim();
-
-    if (!letter) {
-        alert("⚠️ No letter to download");
-        return;
-    }
-
-    // Création PDF
-    const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage();
-    const { width, height } = page.getSize();
-
-    page.drawText(letter, {
-        x: 50,
-        y: height - 50,
-        size: 12,
-        color: rgb(0, 0, 0),
-        maxWidth: width - 100,
-        lineHeight: 14
-    });
-
-    const pdfBytes = await pdfDoc.save();
-
-    // Télécharger le PDF
-    const blob = new Blob([pdfBytes], { type: "application/pdf" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "cover_letter.pdf";
-    link.click();
-    URL.revokeObjectURL(link.href);
-});
-
-*/
