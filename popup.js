@@ -90,8 +90,9 @@ function deleteHistoryItem(id) {
 
 // ===== GEMINI FETCH (OUTSIDE DOMContentLoaded) =====
 async function generateWithGemini(prompt) {
-    const storageData = await new Promise(resolve => chrome.storage.local.get("userApiKey", resolve));
-    const apiKey = storageData.userApiKey;
+    // 💾 Récupérer de local (persistant)
+    const storageData = await new Promise(resolve => chrome.storage.local.get("apiKey", resolve));
+    const apiKey = storageData.apiKey;
     const errorMsg = document.getElementById("errorMsg");
 
     if (!apiKey) {
@@ -220,9 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.storage.local.get("userCV", (data) => {
         if(data.userCV) document.getElementById("cvInput").value = data.userCV;
     });
-    chrome.storage.local.get("userApiKey", (data) => {
-        if(data.userApiKey) document.getElementById("apiKeyInput").value = data.userApiKey;
-    });
+
     chrome.storage.local.get("generatedLetter", (data) => {
         if (data.generatedLetter) {
             document.getElementById("output").value = data.generatedLetter;
@@ -239,14 +238,43 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // ===== LOAD API KEY ON STARTUP =====
+    chrome.storage.local.get("apiKey", (result) => {
+        if (result.apiKey) {
+            document.getElementById("apiKeyInput").placeholder = "••••••••••••••••• (Saved)";
+        }
+    });
+
     // ===== SAVE API KEY =====
-    document.getElementById("saveApiKeyBtn").addEventListener("click", () => {
-        const apiKey = document.getElementById("apiKeyInput").value;
-        chrome.storage.local.set({ userApiKey: apiKey }, () => {
-            const msg = document.getElementById("message");
-            msg.textContent = "API key saved ✅";
-            setTimeout(() => msg.textContent = "", 2000);
-        });
+    document.getElementById("saveApiKeyBtn").addEventListener("click", async () => {
+        const apiKey = document.getElementById("apiKeyInput").value.trim();
+        const msg = document.getElementById("message");
+        const errorMsg = document.getElementById("errorMsg");
+        
+        if (!apiKey) {
+            errorMsg.textContent = "❌ Please enter an API key";
+            errorMsg.style.display = "block";
+            setTimeout(() => errorMsg.style.display = "none", 3000);
+            return;
+        }
+        
+        try {
+            await chrome.storage.local.set({ apiKey: apiKey });
+            
+            // ✅ Vider l'input après sauvegarde
+            document.getElementById("apiKeyInput").value = "";
+            document.getElementById("apiKeyInput").placeholder = "••••••••••••••••• (Saved)";
+            
+            msg.textContent = "✅ API Key saved!";
+            msg.style.display = "block";
+            errorMsg.style.display = "none";
+            
+            setTimeout(() => msg.textContent = "", 3000);
+        } catch (err) {
+            console.error("Error saving API key:", err);
+            errorMsg.textContent = "❌ Error saving API key";
+            errorMsg.style.display = "block";
+        }
     });
 
     // ===== GENERATE LETTER =====
@@ -442,4 +470,6 @@ Date: ${currentDate}
     document.getElementById("exportCsvBtn").addEventListener("click", exportCsv);
 
 });
+
+
 
