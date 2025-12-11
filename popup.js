@@ -68,11 +68,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const getCV = () => new Promise(resolve => chrome.storage.local.get("userCV", resolve));
         generateBtn.disabled = true;
         generateBtn.textContent = "⏳ Generating...";
+        
+        // ✅ DÉCLARER output ET errorMsg ICI (avant try/catch)
+        const errorMsg = document.getElementById("errorMsg");
+        const output = document.getElementById("output");
+        
         try {
             const data = await getCV();
             const cv = data.userCV || "";
-            const errorMsg = document.getElementById("errorMsg");
-            const output = document.getElementById("output");
 
             if (!cv) {
                 errorMsg.textContent = "⚠️ Please enter your CV first.";
@@ -136,11 +139,13 @@ Date: ${currentDate}
             }
         } catch (err) {
             console.error(err);
-            const errorMsg = document.getElementById("errorMsg");
+            
+            // ✅ output ET errorMsg existent maintenant
             if (errorMsg) {
                 errorMsg.textContent = err.message || "An unexpected error occurred.";
                 errorMsg.style.display = "block";
             }
+            output.value = err.message || "An error occurred.";
         } finally {
             generateBtn.disabled = false;
             generateBtn.textContent = "Generate Cover Letter";
@@ -180,11 +185,7 @@ async function generateWithGemini(prompt) {
     const errorMsg = document.getElementById("errorMsg");
 
     if (!apiKey) {
-        if (errorMsg) {
-            errorMsg.textContent = "⚠️ Please enter your API key in Settings.";
-            errorMsg.style.display = "block";
-        }
-        return null;
+        throw new Error("⚠️ Please enter your API key in Settings.");
     }
 
     const payload = {
@@ -248,15 +249,10 @@ async function generateWithGemini(prompt) {
         clearTimeout(timeoutId);
         console.error("❌ Error generating letter:", err);
         
-        if (errorMsg) {
-            if (err.name === 'AbortError') {
-                errorMsg.textContent = "⏱️ Request timed out (30s). Try again.";
-            } else {
-                errorMsg.textContent = err.message || "❌ An unexpected error occurred. Check the console.";
-            }
-            errorMsg.style.display = "block";
-        }
-
-        return null;
+        // ✅ LANCER L'ERREUR AU LIEU DE RETOURNER NULL
+        throw err;
     }
+
+    
 }
+
