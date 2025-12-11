@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "LetterBoost",
+  "name": "ApplyBoost",
   "version": "1.6",
-  "description": "Generate personalized cover letters from your CV",
+  "description": "Boost your job applications with AI-generated cover letters",
   "permissions": ["activeTab", "scripting", "storage", "downloads"],
   "action": {
     "default_popup": "popup.html",
-    "default_icon": "icon.png"
+    "default_icon": "icon.png",
+    "default_title": "ApplyBoost"
   },
   "content_scripts": [
     {
