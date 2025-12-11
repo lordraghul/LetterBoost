@@ -168,48 +168,35 @@ async function generateWithGemini(prompt) {
 
 // ===== EXPORT CSV (SANS INDENTATION) =====
 function exportCsv() {
-    try {
-        chrome.storage.local.get("letterHistory", (data) => {
-            const history = data.letterHistory || [];
-            
-            if (history.length === 0) {
-                alert("⚠️ No history to export");
-                return;
-            }
+    chrome.storage.local.get("letterHistory", (data) => {
+        const history = data.letterHistory || [];
+        
+        if (history.length === 0) {
+            alert("⚠️ No history to export");
+            return;
+        }
 
-            // ✅ Construire le CSV comme un texte simple
-            let csvContent = "Date,URL,Type,Has Letter\n";
+        // ✅ Construire le CSV dans popup.js
+        let csvContent = "Date,URL,Type,Has Letter\n";
+        
+        history.forEach(item => {
+            const date = item.date ? `"${item.date}"` : '""';
+            const url = item.url ? `"${item.url}"` : '""';
+            const type = item.isManual ? '"Manual"' : '"Generated"';
+            const hasLetter = item.letter ? '"Yes"' : '"No"';
             
-            history.forEach(item => {
-                const date = item.date ? `"${item.date}"` : '""';
-                const url = item.url ? `"${item.url}"` : '""';
-                const type = item.isManual ? '"Manual"' : '"Generated"';
-                const hasLetter = item.letter ? '"Yes"' : '"No"';
-                
-                csvContent += `${date},${url},${type},${hasLetter}\n`;
-            });
-
-            // ✅ Créer un blob
-            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-            
-            // ✅ Créer une URL temporaire
-            const link = document.createElement("a");
-            const url = URL.createObjectURL(blob);
-            link.setAttribute("href", url);
-            link.setAttribute("download", `history_${new Date().getTime()}.csv`);
-            link.style.visibility = "hidden";
-            
-            // ✅ Ajouter au DOM et cliquer
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-            console.log("✅ CSV exported: " + history.length + " entries");
+            csvContent += `${date},${url},${type},${hasLetter}\n`;
         });
-    } catch (err) {
-        console.error("❌ Export error:", err);
-        alert("❌ Failed to export CSV");
-    }
+
+        // ✅ Envoyer au background.js pour télécharger
+        chrome.runtime.sendMessage(
+            { action: "downloadCsv", csvContent: csvContent },
+            (response) => {
+                console.log("✅ CSV exported: " + history.length + " entries");
+                alert("✅ CSV exported successfully!");
+            }
+        );
+    });
 }
 
 
