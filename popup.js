@@ -193,7 +193,6 @@ function exportCsv() {
             { action: "downloadCsv", csvContent: csvContent },
             (response) => {
                 console.log("✅ CSV exported: " + history.length + " entries");
-                alert("✅ CSV exported successfully!");
             }
         );
     });
