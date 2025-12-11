@@ -1,4 +1,220 @@
-// ===== TOUT CE CODE VA DANS UN SEUL DOMContentLoaded =====
+function getActiveTabText() {
+    return new Promise((resolve) => {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (chrome.runtime.lastError) {
+                console.info("Content script not available on this page.");
+                return resolve({ text: "" });
+            }
+            if (!tabs || !tabs[0]) return resolve({ text: "" });
+            chrome.tabs.sendMessage(tabs[0].id, { action: "getPageText" }, (response) => {
+                if (chrome.runtime.lastError) {
+                    return resolve({ text: "" });
+                }
+                resolve(response || { text: "" });
+            });
+        });
+    });
+}
+
+
+function loadHistory() {
+    chrome.storage.local.get("letterHistory", (data) => {
+        const history = data.letterHistory || [];
+        const historyList = document.getElementById("historyList");
+
+        if (history.length === 0) {
+            historyList.innerHTML = '<p style="color: #999;">No history yet...</p>';
+            return;
+        }
+
+        historyList.innerHTML = history.reverse().map(item => `
+            <div class="history-item">
+                <div class="history-item-date">📅 ${item.date}</div>
+                <div class="history-item-url">🔗 ${item.url}</div>
+                <div style="font-size: 12px; color: #666; margin: 5px 0;">
+                    ${item.isManual ? "📝 Manual" : "🤖 Generated"} | ID: ${item.id}
+                </div>
+                <div class="history-item-buttons">
+                    ${item.letter ? `<button class="view-btn" data-id="${item.id}">View</button>` : ""}
+                    <button class="delete-btn" data-id="${item.id}">Delete</button>
+                </div>
+            </div>
+        `).join('');
+
+        document.querySelectorAll('.view-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = parseInt(btn.getAttribute('data-id'));
+                viewHistoryLetter(id);
+            });
+        });
+
+        document.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = parseInt(btn.getAttribute('data-id'));
+                deleteHistoryItem(id);
+            });
+        });
+    });
+}
+
+
+function viewHistoryLetter(id) {
+    chrome.storage.local.get("letterHistory", (data) => {
+        const history = data.letterHistory || [];
+        const item = history.find(h => h.id === id);
+        
+        if (item && item.letter) {
+            document.getElementById("output").value = item.letter;
+            // Switch to General tab
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelector('[data-tab="general"]').classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+            document.getElementById("general").style.display = "block";
+        }
+    });
+}
+
+function deleteHistoryItem(id) {
+    if (confirm("Delete this entry from history?")) {
+        chrome.storage.local.get("letterHistory", (data) => {
+            const history = data.letterHistory || [];
+            const filtered = history.filter(h => h.id !== id);
+            
+            chrome.storage.local.set({ letterHistory: filtered }, () => {
+                loadHistory();  // ✅ loadHistory() existe maintenant
+                console.log("✅ Entry deleted from history");
+            });
+        });
+    }
+}
+
+// ===== GEMINI FETCH (OUTSIDE DOMContentLoaded) =====
+async function generateWithGemini(prompt) {
+    const storageData = await new Promise(resolve => chrome.storage.local.get("userApiKey", resolve));
+    const apiKey = storageData.userApiKey;
+    const errorMsg = document.getElementById("errorMsg");
+
+    if (!apiKey) {
+        throw new Error("⚠️ Please enter your API key in Settings.");
+    }
+
+    const payload = {
+        contents: [{ parts: [{ text: prompt }] }]
+    };
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    try {
+        if (!navigator.onLine) {
+            throw new Error("No internet connection. Please check your network.");
+        }
+
+        const response = await fetch(
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-goog-api-key": apiKey
+                },
+                body: JSON.stringify(payload),
+                signal: controller.signal
+            }
+        );
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            let errorMessage = `API Error ${response.status}`;
+            
+            if (response.status === 401 || response.status === 403) {
+                errorMessage = "❌ Invalid API key. Please check your settings.";
+            } else if (response.status === 429) {
+                errorMessage = "⏱️ Too many requests. Please wait a moment and try again.";
+            } else if (response.status === 500 || response.status === 503) {
+                errorMessage = "🔧 Gemini API is temporarily unavailable. Try again later.";
+            } else {
+                errorMessage = `❌ API returned error: ${response.status} ${response.statusText}`;
+            }
+            
+            throw new Error(errorMessage);
+        }
+
+        const responseData = await response.json();
+
+        if (!responseData.candidates || responseData.candidates.length === 0) {
+            throw new Error("API returned no content. Try again.");
+        }
+
+        const letterContent = responseData.candidates[0]?.content?.parts?.[0]?.text;
+        
+        if (!letterContent || letterContent.trim() === "") {
+            throw new Error("API returned an empty response. Try with a different job description.");
+        }
+
+        return letterContent;
+
+    } catch (err) {
+        clearTimeout(timeoutId);
+        console.error("❌ Error generating letter:", err);
+        throw err;
+    }
+
+    
+}
+
+    // ===== EXPORT CSV =====
+
+// ===== EXPORT CSV (SANS INDENTATION) =====
+function exportCsv() {
+    try {
+        chrome.storage.local.get("letterHistory", (data) => {
+            const history = data.letterHistory || [];
+            
+            if (history.length === 0) {
+                alert("⚠️ No history to export");
+                return;
+            }
+
+            // ✅ Construire le CSV comme un texte simple
+            let csvContent = "Date,URL,Type,Has Letter\n";
+            
+            history.forEach(item => {
+                const date = item.date ? `"${item.date}"` : '""';
+                const url = item.url ? `"${item.url}"` : '""';
+                const type = item.isManual ? '"Manual"' : '"Generated"';
+                const hasLetter = item.letter ? '"Yes"' : '"No"';
+                
+                csvContent += `${date},${url},${type},${hasLetter}\n`;
+            });
+
+            // ✅ Créer un blob
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            
+            // ✅ Créer une URL temporaire
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `history_${new Date().getTime()}.csv`);
+            link.style.visibility = "hidden";
+            
+            // ✅ Ajouter au DOM et cliquer
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            console.log("✅ CSV exported: " + history.length + " entries");
+        });
+    } catch (err) {
+        console.error("❌ Export error:", err);
+        alert("❌ Failed to export CSV");
+    }
+}
+
+
+
+
 document.addEventListener('DOMContentLoaded', () => {
     
     // ===== TABS =====
@@ -131,8 +347,40 @@ Date: ${currentDate}
             const letter = await generateWithGemini(prompt);
             if (letter) {
                 output.value = letter;
+                
                 chrome.storage.local.set({ generatedLetter: letter }, () => {
                     console.log("✅ Letter saved in storage.");
+                });
+
+                // ✅ AJOUTER À L'HISTORIQUE
+                const response = await getActiveTabText();
+                
+                // ✅ RÉCUPÉRER L'URL DE L'ONGLET ACTIF (pas window.location.href)
+                chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                    const jobUrl = tabs[0]?.url || "Unknown URL";  // ✅ URL du job posting
+                    
+                    chrome.storage.local.get("letterHistory", (data) => {
+                        const history = data.letterHistory || [];
+                        
+                        history.push({
+                            id: Date.now(),
+                            date: new Date().toLocaleString(),
+                            url: jobUrl,  // ✅ URL correcte du posting
+                            jobDescription: response?.text || "N/A",
+                            letter: letter,
+                            language: document.getElementById("languageSelect").value
+                        });
+
+                        // Garder les 50 dernières lettres max
+                        if (history.length > 50) {
+                            history.shift();
+                        }
+
+                        chrome.storage.local.set({ letterHistory: history }, () => {
+                            console.log("✅ Letter added to history. Total: " + history.length);
+                            loadHistory();  // ✅ Recharger l'historique pour voir la nouvelle entrée
+                        });
+                    });
                 });
             } else {
                 output.value = "";
@@ -157,102 +405,55 @@ Date: ${currentDate}
         chrome.runtime.sendMessage({ action: "downloadLetter" });
     });
 
-});  // ✅ FIN du DOMContentLoaded unique
-
-// ===== HELPER FUNCTION (OUTSIDE DOMContentLoaded) =====
-function getActiveTabText() {
-    return new Promise((resolve) => {
+    // ===== ADD MANUAL JOB URL =====
+    document.getElementById("addManualJobBtn").addEventListener("click", () => {
+        // ✅ Récupérer l'URL de l'onglet actif automatiquement
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            if (chrome.runtime.lastError) {
-                console.info("Content script not available on this page.");
-                return resolve({ text: "" });
+            const jobUrl = tabs[0]?.url || "Unknown URL";
+
+            if (jobUrl === "Unknown URL") {
+                alert("⚠️ Could not get the current tab URL");
+                return;
             }
-            if (!tabs || !tabs[0]) return resolve({ text: "" });
-            chrome.tabs.sendMessage(tabs[0].id, { action: "getPageText" }, (response) => {
-                if (chrome.runtime.lastError) {
-                    return resolve({ text: "" });
-                }
-                resolve(response || { text: "" });
+
+            chrome.storage.local.get("letterHistory", (data) => {
+                const history = data.letterHistory || [];
+                
+                history.push({
+                    id: Date.now(),
+                    date: new Date().toLocaleString(),
+                    url: jobUrl,  // ✅ URL de l'onglet actif
+                    letter: null,  // ✅ Pas de lettre générée
+                    isManual: true  // ✅ Marker pour différencier
+                });
+
+                chrome.storage.local.set({ letterHistory: history }, () => {
+                    console.log("✅ Job URL added to history: " + jobUrl);
+                    loadHistory();  // Recharger l'historique
+                });
             });
         });
     });
-}
 
-// ===== GEMINI FETCH (OUTSIDE DOMContentLoaded) =====
-async function generateWithGemini(prompt) {
-    const storageData = await new Promise(resolve => chrome.storage.local.get("userApiKey", resolve));
-    const apiKey = storageData.userApiKey;
-    const errorMsg = document.getElementById("errorMsg");
+    // ===== LOAD HISTORY =====
 
-    if (!apiKey) {
-        throw new Error("⚠️ Please enter your API key in Settings.");
-    }
 
-    const payload = {
-        contents: [{ parts: [{ text: prompt }] }]
-    };
+    // Charger l'historique au démarrage
+    loadHistory();
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-    try {
-        if (!navigator.onLine) {
-            throw new Error("No internet connection. Please check your network.");
+    // ===== CLEAR HISTORY =====
+    document.getElementById("clearHistoryBtn").addEventListener("click", () => {
+        if (confirm("⚠️ Are you sure you want to clear all history?")) {
+            chrome.storage.local.set({ letterHistory: [] }, () => {
+                loadHistory();
+                console.log("✅ History cleared");
+            });
         }
+    });
 
-        const response = await fetch(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "x-goog-api-key": apiKey
-                },
-                body: JSON.stringify(payload),
-                signal: controller.signal
-            }
-        );
 
-        clearTimeout(timeoutId);
+    // ===== EXPORT CSV =====
+    document.getElementById("exportCsvBtn").addEventListener("click", exportCsv);
 
-        if (!response.ok) {
-            let errorMessage = `API Error ${response.status}`;
-            
-            if (response.status === 401 || response.status === 403) {
-                errorMessage = "❌ Invalid API key. Please check your settings.";
-            } else if (response.status === 429) {
-                errorMessage = "⏱️ Too many requests. Please wait a moment and try again.";
-            } else if (response.status === 500 || response.status === 503) {
-                errorMessage = "🔧 Gemini API is temporarily unavailable. Try again later.";
-            } else {
-                errorMessage = `❌ API returned error: ${response.status} ${response.statusText}`;
-            }
-            
-            throw new Error(errorMessage);
-        }
-
-        const responseData = await response.json();
-
-        if (!responseData.candidates || responseData.candidates.length === 0) {
-            throw new Error("API returned no content. Try again.");
-        }
-
-        const letterContent = responseData.candidates[0]?.content?.parts?.[0]?.text;
-        
-        if (!letterContent || letterContent.trim() === "") {
-            throw new Error("API returned an empty response. Try with a different job description.");
-        }
-
-        return letterContent;
-
-    } catch (err) {
-        clearTimeout(timeoutId);
-        console.error("❌ Error generating letter:", err);
-        
-        // ✅ LANCER L'ERREUR AU LIEU DE RETOURNER NULL
-        throw err;
-    }
-
-    
-}
+});
 

@@ -22,6 +22,40 @@
         button { width: 100%; padding: 10px; font-size: 16px; margin-top: 10px; }
         textarea { width: 100%; height: 350px; margin-top: 10px; }
         input[type="text"] { width: 100%; padding: 8px; margin-top: 10px; }
+
+        /* Historique styles */
+        .history-item {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        
+        .history-item-date {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .history-item-url {
+            font-size: 12px;
+            color: #0066cc;
+            word-break: break-all;
+            margin: 5px 0;
+        }
+        
+        .history-item-buttons {
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+        }
+        
+        .history-item-buttons button {
+            flex: 1;
+            padding: 5px;
+            font-size: 12px;
+            margin: 0;
+        }
     </style>
 </head>
 <body>
@@ -31,15 +65,16 @@
     <div>
         <div class="tab active" data-tab="general">General</div>
         <div class="tab" data-tab="settings">Settings</div>
+        <div class="tab" data-tab="history">History</div>  <!-- ✅ AJOUTER -->
     </div>
 
     <!-- Contenu onglets -->
     <div id="general" class="tab-content" style="display:block;">
         <textarea id="output" placeholder="Your letter will appear here..."></textarea>
         <button id="generateBtn">Generate Cover Letter</button>
-        <button id="downloadBtn" >Download Cover Letter as TXT</button>
-
+        <button id="downloadBtn">Download as TXT</button>
     </div>
+
     <div id="settings" class="tab-content">
         <label for="languageSelect">Language:</label>
         <select id="languageSelect">
@@ -72,9 +107,28 @@
         <p id="errorMsg" style="color:red; display:none;"></p>
     </div>
 
+    <!-- ✅ NOUVEL ONGLET HISTORY -->
+    <div id="history" class="tab-content">
+        <!-- ===== FORM TO ADD MANUAL JOB URL ===== -->
+        <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 15px; border-radius: 5px; background-color: #f9f9f9;">
+            <h3 style="margin-top: 0; font-size: 14px;">📝 Add Current Job</h3>
+            <button id="addManualJobBtn" style="width: 100%; padding: 10px; background-color: #4CAF50; color: white; cursor: pointer;">Add Current Tab to History</button>
+        </div>
+
+        <!-- ===== HISTORY LIST ===== -->
+        <div id="historyList" style="max-height: 250px; overflow-y: auto;">
+            <p style="color: #999;">No history yet...</p>
+        </div>
+
+        <!-- ===== EXPORT & CLEAR BUTTONS ===== -->
+        <div style="display: flex; gap: 5px; margin-top: 10px;">
+            <button id="exportCsvBtn" style="flex: 1; padding: 10px; background-color: #2196F3; color: white; cursor: pointer;">📥 Export CSV</button>
+            <button id="clearHistoryBtn" style="flex: 1; padding: 10px; background-color: #ff6b6b; color: white; cursor: pointer;">🗑️ Clear</button>
+        </div>
+    </div>
+
     <!-- Scripts -->
-
-
+    <script src="libs/pdf-lib.min.js"></script>
     <script src="popup.js"></script>
 
 </body>
