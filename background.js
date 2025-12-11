@@ -14,13 +14,13 @@ chrome.runtime.onMessage.addListener( async (request, sender, sendResponse) => {
         });
     }
 
-    // ===== DOWNLOAD CSV =====
+    // ===== DOWNLOAD CSV (AVEC DATA URL) =====
     if (request.action === "downloadCsv") {
-        const blob = new Blob([request.csvContent], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
+        // ✅ Utiliser une Data URL au lieu de URL.createObjectURL
+        const dataUrl = "data:text/csv;charset=utf-8," + encodeURIComponent(request.csvContent);
         
         chrome.downloads.download({
-            url: url,
+            url: dataUrl,
             filename: `history_${new Date().getTime()}.csv`,
             saveAs: false
         });
